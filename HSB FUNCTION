@@ -1,0 +1,92 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+import matplotlib
+
+# --- 介面質感與字體設定 ---
+matplotlib.rcParams['font.family'] = ['Microsoft JhengHei', 'sans-serif']
+matplotlib.rcParams['axes.unicode_minus'] = False 
+
+def hsb_branch_oscillator(n, offset=0, parity=1):
+    """首領核心 HSB 函數：決定分枝干涉與幾何剛性"""
+    n_safe = np.clip(n, 1e-9, 0.2499)
+    s = parity * np.sqrt(0.25 - n_safe + 0j)
+    p = -0.5j * (np.log(1 + 1j*s + 1e-15j) - np.log(1 - 1j*s + 1e-15j))
+    inner = np.sqrt(1 - (n_safe**2)/4 + 0j) + 1j*(n_safe/2)
+    x = -0.5j * np.log(inner)
+    return np.cos(x/2) + np.exp(1j * (p + offset)) * np.sin(x/2)
+
+def reconstruct_and_inject(hex_code, n_val, dist_grid):
+    """【新整合】Feedback機制：將廢熱代碼轉化為空間干擾場"""
+    try:
+        raw_val = int(hex_code, 16)
+        interference_freq = (raw_val % 10) 
+        injection_field = np.sin(dist_grid * interference_freq) * np.sqrt(0.25 - n_val)
+        return injection_field.real
+    except:
+        return 0
+
+def run_feedback_observer():
+    fig = plt.figure(figsize=(16, 9), facecolor='black')
+    gs = fig.add_gridspec(2, 2, height_ratios=[1.6, 1])
+    
+    ax_3d = fig.add_subplot(gs[0, :], projection='3d', facecolor='black')
+    ax_hex = fig.add_subplot(gs[1, 1], facecolor='black')
+    
+    res = 50
+    X, Y = np.meshgrid(np.linspace(-1.5, 1.5, res), np.linspace(-1.5, 1.5, res))
+    dist = np.sqrt(X**2 + Y**2)
+    
+    hex_log = [] 
+    # 初始餵食的「第一口」廢熱
+    target_hex = "0x249D5F4F113144"
+    fixed_energy_source = "940829"
+    def update(frame):
+        # 使用 nonlocal 關鍵字，允許 update 修改外部的 target_hex，達成回收循環
+        nonlocal target_hex 
+        
+        ax_3d.clear()
+        ax_hex.clear()
+        
+        energy = np.abs(np.sin(frame * 0.1))
+        n =  0.15 + 0.0995 * energy 
+        
+        phase_shift = dist * 4 - frame * 0.2
+        z_base = (hsb_branch_oscillator(n, phase_shift, 1) + 
+                  hsb_branch_oscillator(n, phase_shift, -1)) / 2
+        
+        # 這裡使用的是「上一幀」產生的廢熱或是初始廢熱
+        injection = reconstruct_and_inject(fixed_energy_source, n, dist)
+        
+        Z = (z_base.real + injection * 1.5) * (1 + energy * 2) 
+        Z += (energy * 1.8 * np.exp(-dist**2 * 18))
+        
+        surf = ax_3d.plot_surface(X, Y, Z, cmap='inferno', edgecolor='cyan', 
+                                   linewidth=0.1, alpha=0.9, antialiased=True)
+        ax_3d.set_zlim(-2.5, 3.5)
+        ax_3d.set_axis_off()
+        ax_3d.view_init(elev=26, azim=frame * 0.4)
+        ax_3d.set_title(f"HSB 廢熱回收循環中 | 剛性: {n:.4f} | 當前餵食: {target_hex}", color='#00ffcc', fontsize=12)
+
+        # --- 高維廢熱排放與自動回收 ---
+        if frame % 4 == 0:
+            h_val = hex(int(np.abs(z_base.max()) * 1e16 + frame))
+            hex_log.append(f"RECYCLE >> {h_val.upper()}")
+            if len(hex_log) > 12: hex_log.pop(0)
+            
+            # 【關鍵：廢熱回收】將這一幀產生的廢熱，設定為下一幀的注入源
+            target_hex = h_val 
+            
+        for i, m in enumerate(hex_log):
+            ax_hex.text(0.05, 0.95 - i*0.07, m, color='#ff00ff', family='monospace', fontsize=9)
+        ax_hex.set_title("廢熱回收監控 (Infinite Feedback Loop)", color='white', fontsize=10)
+        ax_hex.set_axis_off()
+
+        return surf,
+
+    ani = FuncAnimation(fig, update, frames=500, interval=40)
+    plt.tight_layout()
+    plt.show()
+
+if __name__ == "__main__":
+    run_feedback_observer()
