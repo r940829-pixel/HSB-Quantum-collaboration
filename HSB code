@@ -1,0 +1,136 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+import matplotlib
+
+# --- 介面質感設定 ---
+matplotlib.rcParams['font.family'] = ['Microsoft JhengHei', 'sans-serif']
+matplotlib.rcParams['axes.unicode_minus'] = False
+
+def hsb_core(n, offset=0, parity=1):
+    """核心 HSB 幾何子函數 (B組使用)"""
+    n_safe = np.clip(n, 1e-9, 0.2499)
+    s = parity * np.sqrt(0.25 - n_safe + 0j)
+    p = -0.5j * (np.log(1 + 1j*s + 1e-15j) - np.log(1 - 1j*s + 1e-15j))
+    inner = np.sqrt(1 - (n_safe**2)/4 + 0j) + 1j*(n_safe/2)
+    x = -0.5j * np.log(inner)
+    return np.cos(x/2) + np.exp(1j * (p + offset)) * np.sin(x/2)
+
+def generate_initial_qubit_positions(num_qubits=12, radius=0.6):
+    """計算量子位元的初始對稱座標與波函數相位"""
+    angles = np.linspace(0, 2*np.pi, num_qubits, endpoint=False)
+    qx = radius * np.cos(angles)
+    qy = radius * np.sin(angles)
+    # 為每顆位元賦予一個初始量子相位
+    initial_phases = angles
+    return qx, qy, initial_phases
+
+def run_decoherence_experiment():
+    fig = plt.figure(figsize=(16, 8), facecolor='black')
+    ax1 = fig.add_subplot(121, projection='3d', facecolor='black') # A組: 荒蕪空間 (退相干)
+    ax2 = fig.add_subplot(122, projection='3d', facecolor='black') # B組: 心星之繭 (幾何保護)
+
+    axes = [ax1, ax2]
+    titles = ["A組: 荒蕪空間 (波函數崩塌與退相干)", "B組: 心星之繭 (規律的相干演化)"]
+    
+    # 1. 空間與環境設定
+    res = 50
+    x = np.linspace(-1.5, 1.5, res)
+    y = np.linspace(-1.5, 1.5, res)
+    X, Y = np.meshgrid(x, y)
+    dist = np.sqrt(X**2 + Y**2)
+    
+    # 2. 預計算量子位元位置與初始相位
+    num_qubits = 12
+    qx_init, qy_init, q_phases = generate_initial_qubit_positions(num_qubits, radius=0.6)
+    
+    # A組位元的飄移速度 (模擬退相干的空間擴散)
+    np.random.seed(42)
+    q_drift_x = (np.random.rand(num_qubits) - 0.5) * 0.05
+    q_drift_y = (np.random.rand(num_qubits) - 0.5) * 0.05
+
+    def update(frame):
+        # 模擬隨時間變化的逼真隨機熱噪聲 (Environmental Waste Heat)
+        noise_field = np.zeros_like(X) + np.sin(frame * 0.1) * 0.4 + 0.6 
+        for i in range(3): # 疊加三個噪聲源
+            freq = 2 + i * 1.5
+            phase_shift = frame * (0.1 + i * 0.05)
+            scale_x = 1 + 0.2 * np.random.randn()
+            scale_y = 1 + 0.2 * np.random.randn()
+            noise_field += np.sin(X * freq * scale_x + phase_shift) * np.cos(Y * freq * scale_y - phase_shift)
+        
+        # 歸一化噪聲強度
+        noise_field = (noise_field - noise_field.min()) / (noise_field.max() - noise_field.min() + 1e-9) - 0.5
+        noise_intensity = np.sin(frame * 0.05) * 0.4 + 0.6 
+        Z_noise = noise_field * noise_intensity * 1.5 
+
+        # --- B組: 心星之繭幾何底層 ---
+        phase = dist * 4 - frame * 0.1
+        n_stable = 0.24 # 首領實證的超穩定剛性
+        z_base_b = (hsb_core(n_stable, phase, 1) + hsb_core(n_stable, phase, -1)) / 2
+        Z_stable = z_base_b.real + np.exp(-dist**2 * 8) * 2.2 - Z_noise * 0.2
+
+        final_Zs = [Z_noise, Z_stable]
+        
+        for i, ax in enumerate(axes):
+            ax.clear()
+            Z = final_Zs[i]
+            
+            # 繪製幾何場曲面
+            cmap = 'binary' if i == 0 else 'viridis'
+            surf = ax.plot_surface(X, Y, Z, cmap=cmap, edgecolor='cyan' if i==1 else 'gray', 
+                                    linewidth=0.01 if i==1 else 0.05, alpha=0.8, antialiased=True)
+            
+            # --- 部署與波函數演化觀測 ---
+            omega = 0.2 # 波函數演化頻率
+            
+            for j in range(num_qubits):
+                if i == 0: # A組: 荒蕪空間 (退相干崩塌)
+                    qx = np.clip(qx_init[j] + q_drift_x[j] * frame * 0.2, -1.4, 1.4)
+                    qy = np.clip(qy_init[j] + q_drift_y[j] * frame * 0.2, -1.4, 1.4)
+                    
+                    idx_x = int((qx + 1.5) / 3 * (res - 1))
+                    idx_y = int((qy + 1.5) / 3 * (res - 1))
+                    qz_geom = Z_noise[idx_y, idx_x]
+                    
+                    jitter = (np.random.randn() * noise_intensity * 0.3)
+                    qz_final = qz_geom + 0.3 + jitter
+                    
+                    # 波函數崩塌：大小劇烈閃爍，相位丟失
+                    psi_amplitude = 10 + 80 * np.random.rand()
+                    alpha_val = 0.5 + 0.5 * np.random.rand()
+                    q_color = 'red' 
+                    
+                else: # B組: 心星之繭 (幾何保護與相干)
+                    qx, qy = qx_init[j], qy_init[j]
+                    
+                    idx_x = int((qx + 1.5) / 3 * (res - 1))
+                    idx_y = int((qy + 1.5) / 3 * (res - 1))
+                    qz_geom = Z_stable[idx_y, idx_x]
+                    
+                    jitter = (np.random.randn() * noise_intensity * 0.01)
+                    qz_final = qz_geom + 0.25 + jitter
+                    
+                    # 相干演化：依照獨立相位平滑振盪 (呼吸效應)
+                    psi_amplitude = 40 + 20 * np.sin(frame * omega + q_phases[j])
+                    alpha_val = 0.8
+                    q_color = '#ff00ff' 
+                
+                # s 代表機率幅，alpha 代表相位純度
+                ax.scatter(qx, qy, qz_final, color=q_color, s=psi_amplitude, 
+                           edgecolors='white', linewidth=1, alpha=alpha_val)
+            
+            ax.set_zlim(-3, 5)
+            ax.set_axis_off()
+            
+            elev = 35 if i == 0 else 30
+            azim = 30 if i == 0 else frame * 0.5
+            ax.view_init(elev=elev, azim=azim)
+            ax.set_title(titles[i], color='white', fontsize=14)
+
+    ani = FuncAnimation(fig, update, frames=500, interval=50)
+    plt.tight_layout()
+    plt.show()
+
+if __name__ == "__main__":
+    run_decoherence_experiment()
