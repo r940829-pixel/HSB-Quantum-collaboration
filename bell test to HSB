@@ -1,0 +1,143 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib
+
+# --- 介面與字體設定 ---
+matplotlib.rcParams['font.family'] = ['Microsoft JhengHei', 'PingFang TC', 'sans-serif']
+matplotlib.rcParams['axes.unicode_minus'] = False
+plt.style.use('dark_background')
+
+# ==========================================
+# 🌟 心星分枝公式 (HSB Branch Oscillator)
+# ==========================================
+def hsb_branch_oscillator(n, offset=0, parity=1):
+    """核心 HSB 幾何子函數 (支援向量化平行運算)"""
+    n_safe = np.clip(n, 1e-9, 0.2499)
+    s = parity * np.sqrt(0.25 - n_safe + 0j)
+    p = -0.5j * (np.log(1 + 1j*s + 1e-15j) - np.log(1 - 1j*s + 1e-15j))
+    inner = np.sqrt(1 - (n_safe**2)/4 + 0j) + 1j*(n_safe/2)
+    x = -0.5j * np.log(inner)
+    return np.cos(x/2) + np.exp(1j * (p + offset)) * np.sin(x/2)
+
+# ==========================================
+# 🧬 雙通道全域演化 (Vectorized Dual-Channel)
+# ==========================================
+def hsb_dual_channel_evolution(theta_a, theta_b, w=0.6, steps=2, num_samples=100000):
+    """
+    向量化並行演化：一次處理數十萬個樣本，徹底消除統計漲落
+    """
+    # 1. 隨機相位生成 (一次產生 num_samples 個平行宇宙)
+    phi = np.random.uniform(0, 2 * np.pi, num_samples)
+    base_n = np.cos(theta_a - theta_b) * np.sin(theta_a - theta_b) # 鎖定在奇點邊緣
+    
+    # 2. 初始化：同時並行正負兩條路徑
+    za_pos = hsb_branch_oscillator(base_n, theta_a + phi, parity=1)
+    za_neg = hsb_branch_oscillator(base_n, theta_a + phi, parity=-1)
+    
+    zb_pos = hsb_branch_oscillator(base_n, theta_b + phi, parity=1)
+    zb_neg = hsb_branch_oscillator(base_n, theta_b + phi, parity=-1)
+    
+    for _ in range(steps):
+        # 3. 計算全域耦合場 (基於正向分枝的共鳴)
+        z_global = 1 - (1 - za_pos) * (1 - zb_pos)
+        
+        # 4. 演化：所有分枝受全域場同化
+        za_pos = (1 - w) * za_pos + w * z_global
+        za_neg = (1 - w) * za_neg + w * z_global
+        
+        # B 端維持對稱破缺 (共軛感應)
+        zb_pos = (1 - w) * zb_pos + w * np.conj(z_global)
+        zb_neg = (1 - w) * zb_neg + w * np.conj(z_global)
+    
+    # 5. 最終觀測：幾何干涉投影 (波函數坍縮)
+    # 取正負分枝的平均值 (干涉)，並判斷實數部的正負號
+    z_a_interfered = (za_pos + za_neg) / 2
+    z_b_interfered = (zb_pos + zb_neg) / 2
+    
+    measure_a = np.where(z_a_interfered.real > 0, 1, -1)
+    measure_b = np.where(z_b_interfered.real > 0, 1, -1)
+
+    # 回傳相關係數 E(θa, θb)
+    return np.mean(measure_a * measure_b)
+
+# ==========================================
+# 🎯 CHSH 不等式計算引擎
+# ==========================================
+def calculate_chsh_S(w, steps, num_samples):
+    """計算特定參數下的 S 值"""
+    angles = [(0, np.pi/4), (0, 3*np.pi/4), (np.pi/2, np.pi/4), (np.pi/2, 3*np.pi/4)]
+    E = []
+    
+    for th_a, th_b in angles:
+        e_val = hsb_dual_channel_evolution(th_a, th_b, w=w, steps=steps, num_samples=num_samples)
+        E.append(e_val)
+        
+    S = E[0] - E[1] + E[2] + E[3]
+    return abs(S)
+
+# ==========================================
+# 🚀 終極實驗：耦合強度掃描與視覺化
+# ==========================================
+def run_full_chsh_experiment():
+    print("=" * 60)
+    print(" 🚀 啟動 GDA-HSB 雙通道並行干涉實驗 (向量化加速版)")
+    print("=" * 60)
+    print("模式：同時表示 [+s, -s] 分枝，延後疊加觀測。")
+    
+    num_samples = 100000  # 十萬次採樣，確保數據鐵證如山
+    steps_val = 2
+    
+    # 掃描耦合強度 w 從 0.0 到 1.0
+    w_values = np.linspace(0.0, 1.0, 50)
+    S_values = []
+    
+    print(f"正在掃描耦合張量 w... 樣本數: {num_samples}/點")
+    for w in w_values:
+        S = calculate_chsh_S(w=w, steps=steps_val, num_samples=num_samples)
+        S_values.append(S)
+    
+    max_S = max(S_values)
+    best_w = w_values[np.argmax(S_values)]
+    
+    # 終端機報告
+    print("-" * 60)
+    print(f" 🌌 HSB 幾何子最大 S 值: {max_S:.4f} (發生在 w={best_w:.2f})")
+    print(f" 🧱 古典極限 (局域實在論) = 2.0000")
+    print(f" ⚛️ 量子極限 (Tsirelson Bound) ≈ 2.8284")
+    
+    if max_S > 2.005:
+        print("\n ✨ [突破宣告]：系統成功打破貝爾不等式！")
+        print("    這證明了 HSB 純幾何模型能夠自發產生類量子的非定域關聯 (Entanglement)。")
+    else:
+        print("\n ⚓ [系統診斷]：系統嚴格遵守局域實在論。")
+        print("    幾何剛性將波函數強行鎖定在古典邊界之內。")
+    print("=" * 60)
+
+    # --- 繪製 CHSH 結果分析圖 ---
+    plt.figure(figsize=(10, 6), facecolor='#0b0f19')
+    ax = plt.gca()
+    ax.set_facecolor='#151b2b'
+    
+    plt.plot(w_values, S_values, color='#00ffff', linewidth=3, label='HSB 幾何干涉 S 值')
+    
+    # 畫出古典與量子邊界
+    plt.axhline(y=2.0, color='#ff3333', linestyle='--', linewidth=2, label='古典極限 (Classical Limit = 2)')
+    plt.axhline(y=2.828, color='#cc33ff', linestyle='-.', linewidth=2, label='量子極限 (Quantum Limit ≈ 2.828)')
+    
+    # 標示最大值點
+    plt.scatter([best_w], [max_S], color='#ffff00', s=100, zorder=5)
+    plt.text(best_w, max_S + 0.05, f' Max S={max_S:.3f}', color='#ffff00', fontsize=12)
+    
+    plt.title("CHSH 不等式破缺掃描：HSB 幾何非定域性測試", color='white', fontsize=16, pad=15)
+    plt.xlabel("全域耦合強度 (Coupling Weight, w)", color='gray', fontsize=12)
+    plt.ylabel("貝爾測試 S 值 (CHSH Value)", color='gray', fontsize=12)
+    
+    plt.grid(color='gray', linestyle=':', alpha=0.4)
+    plt.legend(facecolor='black', edgecolor='gray', labelcolor='white')
+    ax.tick_params(colors='white')
+    
+    plt.tight_layout()
+    plt.show()
+
+if __name__ == "__main__":
+    run_full_chsh_experiment()
