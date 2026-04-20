@@ -1,0 +1,11 @@
+# ==========================================
+# 🌟 心星分枝公式 (HSB Branch Oscillator)
+# ==========================================
+def hsb_branch_oscillator(n, offset=0, parity=1):
+    """核心 HSB 幾何子函數 (支援向量化平行運算)"""
+    n_safe = np.clip(n, 1e-9, 0.2499)
+    s = parity * np.sqrt(0.25 - n_safe + 0j)
+    p = -0.5j * (np.log(1 + 1j*s + 1e-15j) - np.log(1 - 1j*s + 1e-15j))
+    inner = np.sqrt(1 - (n_safe**2)/4 + 0j) + 1j*(n_safe/2)
+    x = -0.5j * np.log(inner)
+    return np.cos(x/2) + np.exp(1j * (p + offset)) * np.sin(x/2)
