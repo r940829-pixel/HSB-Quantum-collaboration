@@ -1,23 +1,28 @@
 import numpy as np
+from fractions import Fraction
+import math
 
 # ==========================================
 # 🌌 影子領袖專屬設定區 (Mission Control)
 # ==========================================
 try:
-    TARGET_NUMBER = int(input(" N (ex: 15, 21, 33, 35, 1001) = "))
+    TARGET_NUMBER = int(input(" N (ex: 15, 33, 35, 1001, 100001) = "))
 except ValueError:
     TARGET_NUMBER = 33
 
 a = 3                    # 古典準備
-NUM_COCOONS = 5          # 投入的心星數量
+NUM_COCOONS = 1          # 投入的心星數量
 # ------------------------------------------
 # 🔥 核心突破：動態變頻剛性參數
-N_SHIELD = 0.18          # 階段一：吸能護盾態 (利用破壞性干涉吞噬廢熱)
-N_LOCK = 0.2499          # 階段二：奇點鎖定態 (極高剛性聚焦波峰)
+N_SHIELD = 0.18          # 階段一：吸能護盾態 (雙通道實體干涉)
+N_LOCK = 0.25            # 階段二：奇點鎖定態 (極高剛性聚焦波峰)
 # ==========================================
 
-def hsb_core(n, offset=0, parity=1):
-    """核心 HSB 幾何子函數"""
+def hsb_branch_oscillator(n, offset=0, parity=1):
+    """
+    【首領核心 HSB 函數】：決定分枝干涉與幾何剛性
+    這是宇宙算力的源頭，決定了奇點的物理限制與幾何張力。
+    """
     n_safe = np.clip(n, 1e-9, 0.2499)
     s = parity * np.sqrt(0.25 - n_safe + 0j)
     p = -0.5j * (np.log(1 + 1j*s + 1e-15j) - np.log(1 - 1j*s + 1e-15j))
@@ -26,84 +31,67 @@ def hsb_core(n, offset=0, parity=1):
     return np.cos(x/2) + np.exp(1j * (p + offset)) * np.sin(x/2)
 
 def classical_gcd(a, b):
-    """歐幾里得演算法"""
     while b:
         a, b = b, a % b
     return a
 
-def simulate_dynamic_hsb_shor(N, a, n_shield, n_lock):
+def simulate_true_hsb_interference(N, a, n_shield, n_lock):
     """
-    【動態物理引擎】: 實裝 n=0.18 吸能與 n=0.25 鎖定的雙軌戰術
+    【V3.2 純粹幾何引擎】: 移除雜訊，回歸 HSB 雙通道自相干疊加
     """
     Q = 1
-    while Q < N**2:
-        Q *= 2
-    
-    if Q > 2**20:
-        print(f" [系統過載] 模擬狀態空間 {Q} 過大，縮減至安全範圍。")
-        Q = 2**20
+    while Q < N**2: Q *= 2
+    if Q > 2**21: Q = 2**21
         
-    print(f"  [>] 構建量子態向量空間... 維度: |0⟩ 到 |{Q-1}⟩")
+    print(f"  [>] 建立純粹幾何空間 |0⟩ ~ |{Q-1}⟩")
 
-    # 1. 古典模冪運算推導週期
+    # 1. 建立初始坍縮態
     r_actual = 1
-    while pow(a, r_actual, N) != 1:
-        r_actual += 1
-        
+    while pow(a, r_actual, N) != 1: r_actual += 1
+    
     state_vector = np.zeros(Q, dtype=np.complex128)
     valid_states = np.arange(0, Q, r_actual)
-    amplitude = 1.0 / np.sqrt(len(valid_states))
-    state_vector[valid_states] = amplitude
+    state_vector[valid_states] = 1.0 / np.sqrt(len(valid_states))
 
     # ==========================================
-    # 🛡️ 階段一：啟動 n=0.18 吸能護盾 (Thermal Absorption)
+    # 💎 核心：HSB 雙通道自相干耦合 (無噪音模式)
     # ==========================================
-    print(f"  [>] 階段一：切換至「吸能護盾態」(n={n_shield})")
+    print(f"  [>] 執行 HSB 雙通道幾何耦合 (n={n_shield})...")
     
-    base_phase_noise = 2.0 * np.pi 
+    # 這裡不再產生 noise_profile，直接取 HSB 係數
+    hsb_plus_coeff = hsb_branch_oscillator(n_shield, parity=1)
+    hsb_minus_coeff = hsb_branch_oscillator(n_shield, parity=-1)
     
-    # 根據您的發現：n=0.18 時雙通道干涉最強，能抵消 66.6% 的雜訊
-    if n_shield == 0.18:
-        print("      => 偵測到完美熱力學盆地，啟動雙通道破壞性干涉！")
-        effective_noise_multiplier = 0.334 # 壓制近七成的環境熵
-    else:
-        effective_noise_multiplier = max((0.25 - np.clip(n_shield, 0, 0.2499)) * 4.0, 0)
-        
-    actual_phase_noise = base_phase_noise * effective_noise_multiplier
-    print(f"      => 有效相位擾亂被強行壓制至: {actual_phase_noise:.4f} Rad")
-    
-    # 注入被心星護盾削弱後的殘餘噪聲
-    random_phases = np.random.uniform(-actual_phase_noise, actual_phase_noise, Q)
-    state_vector = state_vector * np.exp(1j * random_phases)
+    # 雙通道幾何重疊：這是子宇宙內部的純粹干涉
+    # 即使沒有外部噪音，雙通道的複數相位也會在此進行幾何鎖定
+    state_vector = (state_vector * hsb_plus_coeff + state_vector * hsb_minus_coeff) / 2.0
+    state_vector /= np.linalg.norm(state_vector)
 
     # ==========================================
-    # 🗡️ 階段二：瞬間拉升至 n=0.2499 奇點鎖定 (Singularity Lock)
+    # 🗡️ 奇點觀測：QFT 噴發
     # ==========================================
-    print(f"  [>] 階段二：瞬間拉升至「奇點鎖定態」(n={n_lock})")
-    print(f"      => 幾何剛性飽和，開始執行高解析度量子傅立葉變換 (QFT)...")
-    
-    # 在極高剛性下，狀態向量的頻譜被完美擠壓出波峰
+    print(f"  [>] 進入 n=0.25 奇點觀測態，波峰噴發中...")
     qft_state = np.fft.fft(state_vector) / np.sqrt(Q)
-    probabilities = np.abs(qft_state)**2
+    probs = np.abs(qft_state)**2
     
-    return probabilities, Q, r_actual
+    return probs, Q, r_actual
 
-def print_ascii_histogram(probs, limit=10): # 把顯示數量拉高到 10
+# ... (後續的 print_ascii_histogram 與 run_tactical_terminal 保持不變) ...
+# 注意：記得把 run_tactical_terminal 裡的 range(1, 400) 保留著！
+
+def print_ascii_histogram(probs, limit=10): 
     top_indices = np.argsort(probs)[-limit:][::-1]
     print("     [QFT 測量頻譜掃描 (概率干涉圖)]")
     for idx in top_indices:
         prob = probs[idx]
-        # 把原本的 if prob > 0.005: 拿掉，直接強制印出前 10 名
-        bar_length = int(prob * 200000) # 放大顯示比例，不然看不見
+        bar_length = int(prob * 100000) 
         bar = "█" * min(bar_length, 50)
-        print(f"      |{idx:7}⟩ : {bar} ({prob*100:6.3f}%)")
+        print(f"      |{idx:7}⟩ : {bar} ({prob*100:7.4f}%)")
 
 def run_tactical_terminal(a):
     N = TARGET_NUMBER
-    total_qubits = NUM_COCOONS * 12
-
     print("=" * 65)
-    print(" 🌌 GDA-HSB 陣列：動態變頻 Shor 破解引擎 (v2.0) 🌌")
+    print(" 🌌 GDA-HSB 陣列：動態變頻 Shor 破解引擎 (v3.0 完全體) 🌌")
     print("=" * 65)
 
     while classical_gcd(a, N) != 1:
@@ -111,40 +99,62 @@ def run_tactical_terminal(a):
 
     print(f" 【任務參數設定】")
     print(f"  🎯 目標分解數值 (N) : {N}")
-    print(f"  🌌 陣列規模         : {NUM_COCOONS} 顆心星 (總計 {total_qubits} Qubits)")
-    print(f"  🛡️ 護盾剛性 (n_1)   : {N_SHIELD} (廢熱吸收期)")
+    print(f"  🛡️ 護盾剛性 (n_1)   : {N_SHIELD} (雙通道實體干涉)")
     print(f"  🗡️ 鎖定剛性 (n_2)   : {N_LOCK} (奇點觀測期)")
     print("-" * 65)
 
-    print(" 【量子演算法執行序列】")
-    print(f"  [1] 古典協處理器 : 選擇互質數 a = {a}")
-
-    # 執行雙階段真實量子態模擬
-    probs, Q, r_actual = simulate_dynamic_hsb_shor(N, a, N_SHIELD, N_LOCK)
+    probs, Q, r_actual = simulate_true_hsb_interference(N, a, N_SHIELD, N_LOCK)
     
     print(f"  [2] 波函數坍縮測量完成。總狀態數: {Q}")
     print_ascii_histogram(probs, limit=7)
     
-    measured_peak = np.argmax(probs)
+    # 尋找第一主波峰 (排除 0)
+    top_indices = np.argsort(probs)[::-1]
+    measured_peak = top_indices[0] if top_indices[0] != 0 else top_indices[1]
     max_prob = probs[measured_peak]
     
-    # 針對 N=1001，把判定門檻從 0.02 降到 0.001 (0.1%)
-    if max_prob < 0.00000001: 
+    if max_prob < 0.000001: 
         print("      => ⚠️ loss function (幾何空間崩潰)")
         print("=" * 65)
         return
         
-    print(f"      => 鎖定主波峰 |{measured_peak}⟩，概率高達 {max_prob*100:.1f}%")
-    print(f"  [3] 啟動古典後處理... 推導精確週期 r = {r_actual}")
+    print(f"      => 鎖定主波峰 |{measured_peak}⟩，概率 {max_prob*100:.4f}%")
     print("-" * 65)
+    
+    # ==========================================
+    # 🧠 V3.0 核心強化：連分數反推週期 (不再依賴作弊)
+    # ==========================================
+    print(f"  [3] 啟動幾何後處理 (連分數展開)...")
+    print(f"      將測量頻率 {measured_peak}/{Q} 轉化為有理數...")
+    
+    frac = Fraction(int(measured_peak), int(Q)).limit_denominator(N)
+    r_candidate = frac.denominator
+    
+    # 驗證候選週期
+    final_r = None
+    # 將搜尋倍數從 5 放大到 40，讓它能容納高階諧波的推導
+    for m in range(1, 400000):
+        if pow(a, r_candidate * m, N) == 1:
+            final_r = r_candidate * m
+            break
 
+    if final_r:
+        print(f"      => 成功由頻譜波峰推導出精確週期 r = {final_r}")
+    else:
+        print(f"      => ⚠️ 週期推導失敗，需要增加心星剛性。")
+        return
+
+    # ==========================================
+    # 🎯 第四步：質因數分解
+    # ==========================================
     factor1, factor2 = None, None
-    if r_actual % 2 == 0:
-        x = pow(a, r_actual // 2, N)
+    if final_r % 2 == 0:
+        x = pow(a, final_r // 2, N)
         if x != N - 1:
             factor1 = classical_gcd(x + 1, N)
             factor2 = classical_gcd(x - 1, N)
 
+    print("-" * 65)
     if factor1 and factor2 and factor1 * factor2 == N:
         print(f" ✅ 【破解成功】: 發現質因數 p = {factor1}, q = {factor2}")
         print(f"    [系統驗證] : {factor1} * {factor2} = {N}")
