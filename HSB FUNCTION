@@ -8,7 +8,7 @@ matplotlib.rcParams['font.family'] = ['Microsoft JhengHei', 'sans-serif']
 matplotlib.rcParams['axes.unicode_minus'] = False 
 
 def hsb_branch_oscillator(n, offset=0, parity=1):
-   n_safe = np.clip(n, 1e-9, 0.249999) 
+    n_safe = np.clip(n, 1e-9, 0.249999) 
     s = parity * np.sqrt(0.25 - n_safe + 0j)
     p = -0.5j * (np.log(1 + 1j*s + 1e-15j) - np.log(1 - 1j*s + 1e-15j))
     inner = np.sqrt(1 - 4*n_safe**2 + 0j) + 1j*(2*n_safe)
