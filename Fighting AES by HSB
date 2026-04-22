@@ -5,11 +5,12 @@ import time
 # 🌌 首領核心：動態幾何張力引擎
 # ==========================================
 def hsb_branch_oscillator(n, offset=0, parity=1):
-    n_safe = np.clip(n, 1e-9, 0.2499)
+    n_safe = np.clip(n, 1e-9, 0.249999) 
     s = parity * np.sqrt(0.25 - n_safe + 0j)
     p = -0.5j * (np.log(1 + 1j*s + 1e-15j) - np.log(1 - 1j*s + 1e-15j))
-    inner = np.sqrt(1 - (n_safe**2)/4 + 0j) + 1j*(n_safe/2)
+    inner = np.sqrt(1 - 4*n_safe**2 + 0j) + 1j*(2*n_safe)
     x = -0.5j * np.log(inner)
+    
     return np.cos(x/2) + np.exp(1j * (p + offset)) * np.sin(x/2)
 
 def hsb_rigidity_factor(n_start, iterations, total_steps):
