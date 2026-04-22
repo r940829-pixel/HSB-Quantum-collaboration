@@ -63,7 +63,7 @@ def qpe_stress_test(method='HSB', noise_level=8.2, seed=42):
         
         if method == 'HSB':
             # 🛡️ 啟動心星函數防禦：將雜訊交由心星雙通道處理
-            step_rotation = heart_star_shield(0.24, phi_target, noise_level * raw_noise)
+            step_rotation = heart_star_shield(0.18, phi_target, noise_level * raw_noise)
         else:
             # ❌ 傳統方法：沒有幾何保護，雜訊 100% 破壞相位
             step_rotation = np.exp(1j * (phi_target + noise_level * raw_noise))
