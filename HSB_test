@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.optimize import minimize
 
-def hsb_branch_oscillator(n, offset=0, parity=1):
+def hsb_core(n, offset=0, parity=1):
     n_safe = np.clip(n, 1e-9, 0.249999) 
     s = parity * np.sqrt(0.25 - n_safe + 0j)
     p = -0.5j * (np.log(1 + 1j*s + 1e-15j) - np.log(1 - 1j*s + 1e-15j))
