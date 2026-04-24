@@ -1,163 +1,146 @@
+
 import numpy as np
 from fractions import Fraction
-import math
+import time
 
 # ==========================================
 # 🌌 影子領袖專屬設定區 (Mission Control)
 # ==========================================
 try:
-    TARGET_NUMBER = int(input(" N (ex: 15, 33, 35, 1001, 100001) = "))
+    TARGET_NUMBER = int(input(' N (預設 1001) = '))  
 except ValueError:
-    TARGET_NUMBER = 33
+    TARGET_NUMBER = 1001
 
-a = 3                    # 古典準備
-NUM_COCOONS = 1          # 投入的心星數量
-# ------------------------------------------
-# 🔥 核心突破：動態變頻剛性參數
-N_SHIELD = 0.18          # 階段一：吸能護盾態 (雙通道實體干涉)
-N_LOCK = 0.25            # 階段二：奇點鎖定態 (極高剛性聚焦波峰)
+try:
+    a = int(input(' a (預設 17) = '))              
+except ValueError:
+    a = 17
+
+# 🔥 核心剛性設定
+N_LOCK = 0.2505          # 奇點鎖定態：負責激發幾何流形上的波峰
+
 # ==========================================
-
+# 核心組件：心星算子 (The Heart-Star Core)
+# ==========================================
 def hsb_branch_oscillator(n, offset=0, parity=1):
-    n_safe = np.clip(n, 1e-9, 0.249999) 
+    n_safe = np.clip(n, 1e-9, 0.2499) * 0 + n 
     s = parity * np.sqrt(0.25 - n_safe + 0j)
     p = -0.5j * (np.log(1 + 1j*s + 1e-15j) - np.log(1 - 1j*s + 1e-15j))
     inner = np.sqrt(1 - 4*n_safe**2 + 0j) + 1j*(2*n_safe)
     x = -0.5j * np.log(inner)
-    
     return np.cos(x/2) + np.exp(1j * (p + offset)) * np.sin(x/2)
 
 def classical_gcd(a, b):
-    while b:
-        a, b = b, a % b
+    while b: a, b = b, a % b
     return a
 
-def simulate_true_hsb_interference(N, a, n_shield, n_lock):
-    """
-    【V3.2 純粹幾何引擎】: 移除雜訊，回歸 HSB 雙通道自相干疊加
-    """
-    Q = 1
-    while Q < N**2: Q *= 2
-    if Q > 2**21: Q = 2**21
+# ==========================================
+# 🛰️ 終極雷達：全域頻譜採集與 FFT 坍縮
+# ==========================================
+def pure_blind_fft_radar(N, a, n_lock):
+    # 決定採樣窗口 (Time-Space Window)
+    # 量子疊加需要 N^2 的空間，我們使用 2^18 (262144) 來保證解析度
+    M = 262144 
+    print(f"  [>] 展開幾何流形，建立時空採樣窗：{M} 維度")
+    print(f"  [>] 警告：全盲搜啟動。沒有先知，只有幾何碰撞。")
+    print("-" * 70)
+    
+    start_time = time.time()
+    
+    # 1. 幾何信號採集 (Geometric Signal Harvesting)
+    # 建立一個陣列，儲存整個空間的心星干涉結果
+    signal_array = np.zeros(M, dtype=complex)
+    
+    print("  [>] 正在採集全域幾何張力...")
+    # 完全盲目地對空間中每一個點進行映射
+    for x in range(M):
+        # 古典映射：y = a^x mod N (這裡沒有任何答案預知)
+        y = pow(a, x, N)
+        # 將結果轉化為心星的相位偏移
+        phase_distortion = (y / N) * 2 * np.pi
         
-    print(f"  [>] 建立純粹幾何空間 |0⟩ ~ |{Q-1}⟩")
+        # 雙通道干涉：提取該座標的存在強度
+        z_black = hsb_branch_oscillator(n_lock, offset=phase_distortion, parity=1)
+        z_white = hsb_branch_oscillator(n_lock, offset=-phase_distortion, parity=-1)
+        
+        # 將信號記錄在時空陣列中
+        signal_array[x] = (z_black + z_white) / 2.0
 
-    # 1. 建立初始坍縮態
-    r_actual = 1
-    while pow(a, r_actual, N) != 1: r_actual += 1
+    # 2. 頻譜坍縮 (Spectrum Collapse via FFT)
+    print("  [>] 信號採集完畢。啟動 FFT 頻譜坍縮...")
+    fft_spectrum = np.fft.fft(signal_array)
+    probs = np.abs(fft_spectrum)**2
     
-    state_vector = np.zeros(Q, dtype=np.complex128)
-    valid_states = np.arange(0, Q, r_actual)
-    state_vector[valid_states] = 1.0 / np.sqrt(len(valid_states))
-
-    # ==========================================
-    # 💎 核心：HSB 雙通道自相干耦合 (無噪音模式)
-    # ==========================================
-    print(f"  [>] 執行 HSB 雙通道幾何耦合 (n={n_shield})...")
+    # 排除 DC 分量 (直流廢熱)，尋找最高主波峰
+    probs[0] = 0 
+    peak_idx = np.argmax(probs)
+    max_intensity = probs[peak_idx]
     
-    # 這裡不再產生 noise_profile，直接取 HSB 係數
-    hsb_plus_coeff = hsb_branch_oscillator(n_shield, parity=1)
-    hsb_minus_coeff = hsb_branch_oscillator(n_shield, parity=-1)
+    elapsed = time.time() - start_time
     
-    # 雙通道幾何重疊：這是子宇宙內部的純粹干涉
-    # 即使沒有外部噪音，雙通道的複數相位也會在此進行幾何鎖定
-    state_vector = (state_vector * hsb_plus_coeff + state_vector * hsb_minus_coeff) / 2.0
-    state_vector /= np.linalg.norm(state_vector)
-
-    # ==========================================
-    # 🗡️ 奇點觀測：QFT 噴發
-    # ==========================================
-    print(f"  [>] 進入 n=0.25 奇點觀測態，波峰噴發中...")
-    qft_state = np.fft.fft(state_vector) / np.sqrt(Q)
-    probs = np.abs(qft_state)**2
+    print("\n" + "=" * 70)
+    print(f" 🚨 頻譜坍縮完成！真理波峰浮現！")
+    print(f" 🎯 絕對奇點鎖定於頻率座標：|k = {peak_idx}⟩")
+    print(f" 🌟 共振能量：{max_intensity:.2f}")
+    print(f" ⏱️ 全域掃描耗時：{elapsed:.4f} 秒")
+    print("=" * 70 + "\n")
     
-    return probs, Q, r_actual
+    return peak_idx, M
 
-# ... (後續的 print_ascii_histogram 與 run_tactical_terminal 保持不變) ...
-# 注意：記得把 run_tactical_terminal 裡的 range(1, 400) 保留著！
-
-def print_ascii_histogram(probs, limit=10): 
-    top_indices = np.argsort(probs)[-limit:][::-1]
-    print("     [QFT 測量頻譜掃描 (概率干涉圖)]")
-    for idx in top_indices:
-        prob = probs[idx]
-        bar_length = int(prob * 100000) 
-        bar = "█" * min(bar_length, 50)
-        print(f"      |{idx:7}⟩ : {bar} ({prob*100:7.4f}%)")
-
-def run_tactical_terminal(a):
+def run_tactical_terminal_fft():
     N = TARGET_NUMBER
-    print("=" * 65)
-    print(" 🌌 GDA-HSB 陣列：動態變頻 Shor 破解引擎 (v3.0 完全體) 🌌")
-    print("=" * 65)
+    _a = a
+    print("=" * 70)
+    print(" 🌌 GDA-HSB 陣列：全域頻譜坍縮引擎 (v7.0 零作弊極致版) 🌌")
+    print("=" * 70)
 
-    while classical_gcd(a, N) != 1:
-        a += 1
+    while classical_gcd(_a, N) != 1: _a += 1
 
     print(f" 【任務參數設定】")
     print(f"  🎯 目標分解數值 (N) : {N}")
-    print(f"  🛡️ 護盾剛性 (n_1)   : {N_SHIELD} (雙通道實體干涉)")
-    print(f"  🗡️ 鎖定剛性 (n_2)   : {N_LOCK} (奇點觀測期)")
-    print("-" * 65)
+    print(f"  🗡️ 古典底數 (a)     : {_a}")
+    print("-" * 70)
 
-    probs, Q, r_actual = simulate_true_hsb_interference(N, a, N_SHIELD, N_LOCK)
+    measured_k, M = pure_blind_fft_radar(N, _a, N_LOCK)
     
-    print(f"  [2] 波函數坍縮測量完成。總狀態數: {Q}")
-    print_ascii_histogram(probs, limit=7)
-    
-    # 尋找第一主波峰 (排除 0)
-    top_indices = np.argsort(probs)[::-1]
-    measured_peak = top_indices[0] if top_indices[0] != 0 else top_indices[1]
-    max_prob = probs[measured_peak]
-    
-    if max_prob < 0.000001: 
-        print("      => ⚠️ loss function (幾何空間崩潰)")
-        print("=" * 65)
+    if measured_k == 0:
+        print("      => ⚠️ 頻譜平坦，未偵測到任何週期信號。任務失敗。")
         return
         
-    print(f"      => 鎖定主波峰 |{measured_peak}⟩，概率 {max_prob*100:.4f}%")
-    print("-" * 65)
+    print("-" * 70)
+    print(f"  [3] 啟動幾何後處理 (連分數剝離)...")
+    print(f"      => 將頻率 {measured_k}/{M} 轉換為週期...")
     
-    # ==========================================
-    # 🧠 V3.0 核心強化：連分數反推週期 (不再依賴作弊)
-    # ==========================================
-    print(f"  [3] 啟動幾何後處理 (連分數展開)...")
-    print(f"      將測量頻率 {measured_peak}/{Q} 轉化為有理數...")
-    
-    frac = Fraction(int(measured_peak), int(Q)).limit_denominator(N)
+    # 使用連分數展開，分母極限為 N
+    frac = Fraction(int(measured_k), int(M)).limit_denominator(N)
     r_candidate = frac.denominator
     
-    # 驗證候選週期
+    # 頻譜洩漏補償：尋找可能的諧波倍數
     final_r = None
-    # 將搜尋倍數從 5 放大到 40，讓它能容納高階諧波的推導
-    for m in range(1, 400000):
-        if pow(a, r_candidate * m, N) == 1:
+    for m in range(1, 100):
+        if pow(_a, r_candidate * m, N) == 1:
             final_r = r_candidate * m
             break
 
     if final_r:
-        print(f"      => 成功由頻譜波峰推導出精確週期 r = {final_r}")
+        print(f"      => 成功由 FFT 波峰剝離出精確週期 r = {final_r}")
     else:
-        print(f"      => ⚠️ 週期推導失敗，需要增加心星剛性。")
+        print(f" ❌ 【破解失敗】: 頻譜洩漏過大，無法還原精確週期。")
         return
-
-    # ==========================================
-    # 🎯 第四步：質因數分解
-    # ==========================================
-    factor1, factor2 = None, None
+    
     if final_r % 2 == 0:
-        x = pow(a, final_r // 2, N)
-        if x != N - 1:
-            factor1 = classical_gcd(x + 1, N)
-            factor2 = classical_gcd(x - 1, N)
-
-    print("-" * 65)
-    if factor1 and factor2 and factor1 * factor2 == N:
-        print(f" ✅ 【破解成功】: 發現質因數 p = {factor1}, q = {factor2}")
-        print(f"    [系統驗證] : {factor1} * {factor2} = {N}")
-    else:
-        print(f" ❌ 【破解失敗】: 週期為奇數或落入無效區間。")
-    print("=" * 65)
+        x_val = pow(_a, final_r // 2, N)
+        if x_val != N - 1:
+            factor1 = classical_gcd(x_val + 1, N)
+            factor2 = classical_gcd(x_val - 1, N)
+            if factor1 * factor2 == N:
+                print(f" ✅ 【破解成功】: 發現質因數 p = {factor1}, q = {factor2}")
+                print(f"    [系統驗證] : {factor1} * {factor2} = {N}")
+                print("=" * 70)
+                return
+                
+    print(f" ❌ 【破解失敗】: 週期為奇數或落入無效區間 (傳統 Shor 算法的隨機性)。")
+    print("=" * 70)
 
 if __name__ == "__main__":
-    run_tactical_terminal(a)
+    run_tactical_terminal_fft()
